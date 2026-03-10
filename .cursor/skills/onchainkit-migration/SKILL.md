@@ -109,9 +109,18 @@ Summary:
 - Check that `WagmiProvider` wraps the component tree before any wallet hooks are used
 - Ensure `QueryClientProvider` is inside `WagmiProvider`
 
+### Transaction receipt stuck in pending
+- **Symptom**: Transaction hash appears, tx confirms on-chain, but UI stays stuck on "Transaction in progress..." forever
+- **Cause**: `useWaitForTransactionReceipt` has no RPC to poll because the transaction's chain is missing from the wagmi config's `chains` + `transports`
+- **Fix**: (1) Add the target chain to `wagmi-config.ts` chains array AND transports object. (2) Always pass `chainId` to `useWaitForTransactionReceipt({ hash, chainId })` so it polls the correct chain
+
 ### Transaction targets wrong chain
 - The `TransactionForm` auto-switches chains, but the target chain must exist in the wagmi config's `chains` array and `transports` object
 - Common: add `baseSepolia` for testnet transactions (chainId 84532)
+
+### Next.js page export restrictions
+- Next.js only allows specific named exports from page files. Exporting contract call arrays or ABI constants from a page file will cause a build error
+- Fix: make them non-exported `const` declarations or move them to a separate module
 
 ### ABI type errors after transaction migration
 - When defining ABIs inline, use `as const` on the array for proper type inference
@@ -126,5 +135,7 @@ Summary:
 
 - Always use `wagmi` and `viem` directly. Never import from `@coinbase/onchainkit`.
 - The `baseAccount` connector comes from `wagmi/connectors`, not from a separate package.
-- If the project uses Tailwind, use Tailwind classes for the wallet component. If not, install Tailwind or adapt the component to the project's existing styling approach.
+- `wagmi-config.ts` must include every chain the app transacts on. If the original OnchainKit `<Transaction chainId={X} />` used a specific chain, that chain must be in both `chains` and `transports`. Without it, `useWaitForTransactionReceipt` will hang forever.
+- If the project uses Tailwind, use Tailwind classes for the components. If not, adapt to inline styles or the project's existing styling approach (e.g., CSS Modules).
+- Do not export contract call arrays, ABI constants, or other non-page values from Next.js page files. Use non-exported constants or a separate module.
 - Inspect the OnchainKit source code in `node_modules/@coinbase/onchainkit/src/` if you need to understand how a specific component works internally.

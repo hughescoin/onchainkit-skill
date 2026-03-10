@@ -117,9 +117,14 @@ export function TransactionForm({
     reset: resetWrite,
   } = useWriteContract();
 
+  // CRITICAL: Always pass chainId so wagmi polls the correct chain's RPC.
+  // Without this, if the user's wallet is on a different chain than the
+  // transaction target, wagmi has no transport to poll and the receipt
+  // is never found -- the UI hangs in "pending" forever.
   const { data: receipt, isLoading: isWaiting } =
     useWaitForTransactionReceipt({
       hash: txHash,
+      chainId,
     });
 
   useEffect(() => {
@@ -466,6 +471,38 @@ OnchainKit's Transaction supports batching multiple calls into a single transact
 OnchainKit's `TransactionToast` provides toast-style notifications. The replacement shows inline status instead. Add a toast library if toast notifications are needed.
 
 ## Common Issues
+
+### Transaction receipt stuck in pending (UI hangs after wallet confirms)
+**This is the most common bug.** The transaction hash appears, the tx confirms on-chain, but the UI stays stuck on "Transaction in progress..." forever.
+
+**Cause:** `useWaitForTransactionReceipt` needs an RPC to poll for the receipt. If the transaction's chain is not in the wagmi config's `chains` + `transports`, wagmi has no RPC endpoint to poll, so `isSuccess` never becomes `true`.
+
+**Fix (two parts):**
+1. Add the transaction's target chain to `wagmi-config.ts`:
+```typescript
+import { base, baseSepolia } from "wagmi/chains";
+
+export const wagmiConfig = createConfig({
+  chains: [base, baseSepolia],  // Must include every chain the app transacts on
+  transports: {
+    [base.id]: http(),
+    [baseSepolia.id]: http(),   // Must have a transport for each chain
+  },
+  // ...rest
+});
+```
+2. Always pass `chainId` to `useWaitForTransactionReceipt`:
+```typescript
+const { data: receipt } = useWaitForTransactionReceipt({
+  hash: txHash,
+  chainId,  // Ensures polling uses the correct chain's transport
+});
+```
+
+### Next.js page export restrictions
+Next.js only allows specific named exports from page files (`default`, `metadata`, `generateMetadata`, `generateStaticParams`, etc.). If you export contract call arrays, ABI constants, or other non-page values from a page file, the build will fail with an error like: `"calls" is not a valid Page export field`.
+
+**Fix:** Move contract call arrays, ABIs, and addresses to a separate module (e.g., `contracts.ts`) or make them non-exported `const` declarations within the page file.
 
 ### Type error: comparison with "UserRejectedRequestError"
 The wagmi error types don't include `UserRejectedRequestError` as a direct name match. Instead, check `error.message` for "User rejected" or "User denied" strings.
