@@ -77,7 +77,15 @@ Summary:
 
 Read [references/transaction-migration.md](references/transaction-migration.md) for detailed instructions and code.
 
-*This migration step is under development.*
+Summary:
+1. Check the `chainId` prop on existing `<Transaction />` components -- add any missing chains to `wagmi-config.ts`
+2. Create a `TransactionForm` component using wagmi hooks (`useWriteContract`, `useWaitForTransactionReceipt`, `useSwitchChain`)
+3. Component handles the full lifecycle: idle, pending wallet confirmation, confirming on-chain, success, error
+4. Replace all OnchainKit transaction imports (`Transaction`, `TransactionButton`, `TransactionStatus`, `TransactionSponsor`, etc.)
+5. Update the `calls` array format -- use `address`, `abi`, `functionName`, `args` with proper `as const` typing
+6. Map `onStatus` callback to the new lifecycle status names (init, pending, confirmed, success, error)
+
+**Validation gate**: Run `npm run build`. Must pass before continuing. Document any errors in `mistakes.md`.
 
 ### Step 5: Cleanup
 
@@ -100,6 +108,14 @@ Read [references/transaction-migration.md](references/transaction-migration.md) 
 - Verify the wagmi config has the correct connectors configured
 - Check that `WagmiProvider` wraps the component tree before any wallet hooks are used
 - Ensure `QueryClientProvider` is inside `WagmiProvider`
+
+### Transaction targets wrong chain
+- The `TransactionForm` auto-switches chains, but the target chain must exist in the wagmi config's `chains` array and `transports` object
+- Common: add `baseSepolia` for testnet transactions (chainId 84532)
+
+### ABI type errors after transaction migration
+- When defining ABIs inline, use `as const` on the array for proper type inference
+- Mark individual fields like `type: 'function' as const` and `stateMutability: 'nonpayable' as const`
 
 ### Existing wagmi setup detected
 - If the project already wraps with `WagmiProvider`, do NOT add another one
